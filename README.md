@@ -12,7 +12,14 @@
 
 ## Установка
 
-Установите `ComfyUI_ALEXZ_SilentFilm` как отдельный custom node package рядом с `ComfyUI_ALEXZ_tools` в `ComfyUI/custom_nodes/`. Оба пакета нужны для поэтапного workflow проекта: ALEXZ_tools предоставляет общий Module Node Picker и сохранение workflow, а SilentFilm — обработку и video I/O. На текущей рабочей машине каталог уже находится рядом с ALEXZ_tools; отдельный Git remote пока не назначен.
+Установите [ComfyUI_ALEXZ_SilentFilm](https://github.com/AlexZ1967/ComfyUI_ALEXZ_SilentFilm) как отдельный custom node package рядом с `ComfyUI_ALEXZ_tools` в `ComfyUI/custom_nodes/`:
+
+```bash
+cd /путь/к/ComfyUI/custom_nodes
+git clone https://github.com/AlexZ1967/ComfyUI_ALEXZ_SilentFilm.git
+```
+
+Оба пакета нужны для поэтапного workflow проекта: ALEXZ_tools предоставляет общий Module Node Picker и сохранение workflow, а SilentFilm — обработку и video I/O. После установки перезапустите ComfyUI.
 
 Для загрузки и записи видео нужны `ffmpeg` и `ffprobe` в PATH активного окружения ComfyUI. Runtime JavaScript уже поставляется в `web/`; npm-пакеты нужны только для проверки TypeScript и пересборки frontend.
 
