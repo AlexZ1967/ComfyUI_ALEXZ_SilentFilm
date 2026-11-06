@@ -4,7 +4,6 @@ import gc
 import importlib
 import json
 import logging
-import os
 from pathlib import Path
 import sys
 import tempfile
@@ -16,10 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     """Compare cache policies on a real film graph, including preview consumers."""
-    if os.environ.get("CONDA_DEFAULT_ENV") != "p313-torch214-cu132":
-        raise RuntimeError("Запускайте проверку в Conda p313-torch214-cu132.")
     workflow = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "workflows/Видео-в-Хронику-по-этапам.json"
-    data = json.loads(workflow.read_text())
+    data = json.loads(workflow.read_text(encoding="utf-8"))
     # Отдельный процесс импортирует установленный core в CPU-режиме, не запускает сервер.
     sys.path.insert(0, str(ROOT.parents[1]))
     sys.argv = [sys.argv[0], "--cpu"]

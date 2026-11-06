@@ -6,9 +6,11 @@ from functools import lru_cache
 import json
 import logging
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -26,11 +28,21 @@ VIDEO_SUFFIXES = {".mov", ".mp4", ".m4v", ".mkv", ".avi", ".webm", ".mxf", ".mpg
 
 
 def tool(name):
-    """Find the executable in the active environment without installing dependencies."""
-    value = shutil.which(name)
+    """Resolve an explicit FFmpeg executable or search the server process PATH."""
+    variable = {"ffmpeg": "ALEXZ_FFMPEG", "ffprobe": "ALEXZ_FFPROBE"}.get(name)
+    override = os.environ.get(variable, "").strip().strip('"') if variable else ""
+    if override:
+        override = os.path.expandvars(os.path.expanduser(override))
+    value = shutil.which(override or name)
     if not value:
-        raise RuntimeError(f"Не найден {name}. Установите FFmpeg с ffprobe в рабочее окружение ComfyUI.")
+        configured = f" по пути {override}" if override else " в PATH процесса ComfyUI"
+        raise RuntimeError(f"Не найден {name}{configured}. Установите FFmpeg с ffprobe или задайте {variable or 'путь к программе'} перед запуском ComfyUI.")
     return value
+
+
+def _subprocess_options():
+    """Keep FFmpeg console windows hidden when ComfyUI runs on Windows."""
+    return {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
 
 
 def resolve_video_path(value):
@@ -63,7 +75,7 @@ def _probe_command(path, count=False):
     if count:
         command += ["-count_frames"]
     command += ["-show_entries", "stream=width,height,codec_name,pix_fmt,avg_frame_rate,r_frame_rate,nb_frames,nb_read_frames,duration,color_space,color_transfer,color_primaries,color_range,sample_aspect_ratio:stream_tags=rotate:stream_side_data=rotation:format=duration", "-of", "json", str(path)]
-    result = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, timeout=300)
+    result = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, timeout=300, **_subprocess_options())
     if result.returncode:
         raise RuntimeError("ffprobe: " + result.stderr.decode("utf-8", "replace")[-4000:])
     return json.loads(result.stdout)
@@ -134,7 +146,7 @@ def ffmpeg_process(arguments, *, writing=False):
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen([tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-nostdin", *arguments],
                                    stdin=subprocess.PIPE if writing else subprocess.DEVNULL,
-                                   stdout=subprocess.DEVNULL if writing else subprocess.PIPE, stderr=errors)
+                                   stdout=subprocess.DEVNULL if writing else subprocess.PIPE, stderr=errors, **_subprocess_options())
         try:
             yield process
             if writing:
@@ -204,7 +216,7 @@ def _h264_nvenc_available():
                "-preset", "p5", "-f", "null", "-"]
     try:
         result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, timeout=30)
+                                stderr=subprocess.DEVNULL, timeout=30, **_subprocess_options())
     except (OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0

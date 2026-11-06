@@ -9,6 +9,7 @@ import tempfile
 from urllib.parse import urlsplit
 
 from .video_io import VIDEO_SUFFIXES, probe_video, resolve_video_path
+from .file_ops import publish_file, validate_upload_filename
 
 
 def _local_request(request):
@@ -46,9 +47,7 @@ def register_routes(PromptServer, web):
             return web.json_response({"error": "Загрузка разрешена локальному same-origin клиенту."}, status=403)
         temporary = None
         try:
-            name = request.query.get("filename", "")
-            if not name or name.startswith(".") or any(c in name for c in "/\\:") or any(ord(c) < 32 for c in name) or len(name.encode("utf-8")) > 240 or Path(name).suffix.lower() not in VIDEO_SUFFIXES:
-                raise ValueError("Некорректное имя видеофайла.")
+            name = validate_upload_filename(request.query.get("filename", ""), VIDEO_SUFFIXES)
             directory = Path(folder_paths.get_input_directory()) / "alexz_video"
             if directory.is_symlink():
                 raise ValueError("Папка загрузки не должна быть символической ссылкой.")
@@ -72,7 +71,7 @@ def register_routes(PromptServer, web):
             while True:
                 filename = name if counter == 0 else f"{stem}_{counter}{suffix}"
                 try:
-                    os.link(temporary, directory / filename)
+                    publish_file(temporary, directory / filename)
                     break
                 except FileExistsError:
                     counter += 1

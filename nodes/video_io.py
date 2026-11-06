@@ -12,6 +12,7 @@ from ..utils.video_batch import validate_video_batch as _validate_video_batch
 from ..utils.video_io import VIDEO_FORMATS, check_interrupt, decode_frames, encode_frames, make_preview, probe_video, resolve_video_path
 from ..utils.video_memory_plan import estimate_graph, check_resources
 from ..utils.video_cache import enabled as selective_cache_enabled
+from ..utils.file_ops import publish_file
 
 _LOGGER = logging.getLogger("ALEXZ.VideoIO")
 
@@ -135,7 +136,7 @@ class VideoSaveFinal:
                 make_preview(target, proxy_temp)
                 if preview.exists():
                     raise FileExistsError("Файл MP4-превью уже существует.")
-                os.link(proxy_temp, preview)
+                publish_file(proxy_temp, preview)
             except Exception as exc:
                 check_interrupt()
                 preview, preview_error = None, str(exc)

@@ -603,7 +603,7 @@ def test_camera_chunk_device_and_uniform_optics(pipeline):
 def test_staged_workflow_contract(pipeline):
     """Validate saved widget order, IMAGE/metadata links and the explicit projector fps link."""
     path = Path(__file__).resolve().parents[1] / "workflows/Видео-в-Хронику-по-этапам.json"
-    workflow = json.loads(path.read_text())
+    workflow = json.loads(path.read_text(encoding="utf-8"))
     nodes = {n["id"]: n for n in workflow["nodes"]}
     for node in nodes.values():
         if not node["type"].startswith("VideoSilentFilm"):
@@ -644,8 +644,8 @@ def test_staged_workflow_contract(pipeline):
 def test_staged_workflow_preserves_saved_artistic_settings():
     """Preserve camera/projector settings while starting the new emulsion pair neutral."""
     root = Path(__file__).resolve().parents[1] / "workflows"
-    old = json.loads((root / "Видео-в-Хронику.json").read_text())
-    staged = json.loads((root / "Видео-в-Хронику-по-этапам.json").read_text())
+    old = json.loads((root / "Видео-в-Хронику.json").read_text(encoding="utf-8"))
+    staged = json.loads((root / "Видео-в-Хронику-по-этапам.json").read_text(encoding="utf-8"))
     previous = {n["type"]: n for n in old["nodes"]}
     current = {n["type"]: n["widgets_values_named"] for n in staged["nodes"] if n["type"].startswith("VideoSilentFilm")}
     cadence = previous["VideoSilentFilmCadence"]["widgets_values_named"]
@@ -718,7 +718,7 @@ def test_common_seed_uses_separate_effect_streams(pipeline):
 def test_workflow_has_one_common_fixed_seed():
     """Drive all four stages from one installed ComfyUI core integer primitive."""
     path = Path(__file__).resolve().parents[1] / "workflows/Видео-в-Хронику-по-этапам.json"
-    workflow = json.loads(path.read_text())
+    workflow = json.loads(path.read_text(encoding="utf-8"))
     seed = next(n for n in workflow["nodes"] if n["type"] == "PrimitiveInt")
     assert seed["widgets_values"] == [1925, "fixed"]
     assert seed["widgets_values_named"]["value"] == 1925
@@ -806,7 +806,7 @@ def test_selected_segment_midpoint_is_shared_by_stages(pipeline):
         meta = result[2 if cls is pipeline.VideoSilentFilmProjector else 1]
         assert len(image) == count
         torch.testing.assert_close(preview, image[count // 2:count // 2 + 1])
-    workflow = json.loads((Path(__file__).resolve().parents[1] / "workflows/Видео-в-Хронику-по-этапам.json").read_text())
+    workflow = json.loads((Path(__file__).resolve().parents[1] / "workflows/Видео-в-Хронику-по-этапам.json").read_text(encoding="utf-8"))
     by_id = {n["id"]: n for n in workflow["nodes"]}
     camera_node = next(n for n in workflow["nodes"] if n["type"] == "VideoSilentFilmCamera")
     camera_link = next(l for l in workflow["links"] if l[3] == camera_node["id"] and l[4] == 0)

@@ -4,7 +4,7 @@
 
 **Load Source Video (ALEXZ)** (`VideoLoadSource`) читает видео через FFmpeg, включая MOV/ProRes и MXF, сразу выбирая нужные кадры. **Save Final Video (ALEXZ)** (`VideoSaveFinal`) записывает обработанный IMAGE в ProRes/MOV или H.264/MP4. Категория обеих нод — `video/io`.
 
-Нужны доступные в окружении ComfyUI `ffmpeg` и `ffprobe`. Ноды ничего не устанавливают автоматически. В текущем `p313-torch214-cu132` проверен FFmpeg 8.0.1 с `prores_ks` и `libx264`.
+Нужны доступные в PATH процесса ComfyUI `ffmpeg` и `ffprobe`, либо полные пути в `ALEXZ_FFMPEG` и `ALEXZ_FFPROBE`. На Windows это пути к `ffmpeg.exe` и `ffprobe.exe`; после изменения переменных перезапустите ComfyUI. Ноды ничего не устанавливают автоматически. В Linux-окружении разработчика `p313-torch214-cu132` проверен FFmpeg 8.0.1 с `prores_ks` и `libx264`; отдельная установка Windows описана в [гайде платформенной совместимости](GUIDE_PLATFORM_COMPATIBILITY.md).
 
 ## Когда использовать
 

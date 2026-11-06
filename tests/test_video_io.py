@@ -169,6 +169,48 @@ def test_video_io_failed_export_leaves_no_partial_files(io):
         nodes.VideoSaveFinal().save(torch.zeros((2, 24, 32, 3)), filename_prefix="../outside")
 
 
+def test_file_publication_preserves_existing_target(io, tmp_path):
+    """Never overwrite an existing destination on either Windows or POSIX."""
+    module = importlib.import_module("ComfyUI_ALEXZ_SilentFilm.utils.file_ops")
+    source, target = tmp_path / "временный.mov", tmp_path / "готовый.mov"
+    source.write_bytes(b"new")
+    target.write_bytes(b"existing")
+    with pytest.raises(FileExistsError):
+        module.publish_file(source, target)
+    assert target.read_bytes() == b"existing" and source.read_bytes() == b"new"
+
+
+def test_windows_publication_needs_no_hard_links(io, tmp_path, monkeypatch):
+    """Publish a completed file on Windows without requiring NTFS hard links."""
+    module = importlib.import_module("ComfyUI_ALEXZ_SilentFilm.utils.file_ops")
+    source, target = tmp_path / "временный.mov", tmp_path / "готовый.mov"
+    source.write_bytes(b"complete video")
+    monkeypatch.setattr(module.sys, "platform", "win32")
+    monkeypatch.setattr(module.os, "link", lambda *args: pytest.fail("Hard links must not be required on Windows"))
+    module.publish_file(source, target)
+    assert target.read_bytes() == b"complete video" and not source.exists()
+
+
+@pytest.mark.parametrize("name", ["CON.mov", "nul.MP4", "AUX .mov", "LPT1.mp4", "COM¹.mov", "bad?.mov", "bad|name.mov", "clip.mov ", "clip.mov.", "../clip.mov"])
+def test_upload_rejects_nonportable_names(io, name):
+    """Reject traversal and reserved Windows filenames before publishing an upload."""
+    module = importlib.import_module("ComfyUI_ALEXZ_SilentFilm.utils.file_ops")
+    with pytest.raises(ValueError, match="имя видеофайла"):
+        module.validate_upload_filename(name, io[1].VIDEO_SUFFIXES)
+
+
+def test_explicit_ffmpeg_path_with_spaces(io, tmp_path, monkeypatch):
+    """Resolve a quoted Unicode executable path without silently using another FFmpeg."""
+    utils = io[1]
+    executable = str(tmp_path / "Видео инструменты" / "ffmpeg.exe")
+    monkeypatch.setenv("ALEXZ_FFMPEG", f'"{executable}"')
+    monkeypatch.setattr(utils.shutil, "which", lambda name: executable if name == executable else None)
+    assert utils.tool("ffmpeg") == executable
+    monkeypatch.setenv("ALEXZ_FFMPEG", str(tmp_path / "missing.exe"))
+    with pytest.raises(RuntimeError, match="ALEXZ_FFMPEG"):
+        utils.tool("ffmpeg")
+
+
 def test_video_io_probe_route_does_not_queue_workflow(io, source):
     api = importlib.import_module("ComfyUI_ALEXZ_SilentFilm.utils.video_io_api")
     async def run():

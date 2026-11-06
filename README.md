@@ -19,9 +19,17 @@ cd /путь/к/ComfyUI/custom_nodes
 git clone https://github.com/AlexZ1967/ComfyUI_ALEXZ_SilentFilm.git
 ```
 
-Оба пакета нужны для поэтапного workflow проекта: ALEXZ_tools предоставляет общий Module Node Picker и сохранение workflow, а SilentFilm — обработку и video I/O. После установки перезапустите ComfyUI.
+Оба пакета используются в рабочем окружении проекта: ALEXZ_tools предоставляет общий Module Node Picker и сохранение workflow, а SilentFilm — обработку и video I/O. Сам SilentFilm не импортирует ALEXZ_tools и может выполнять свои ноды без него. Установите зависимости тем же Python, которым запускается ComfyUI:
 
-Для загрузки и записи видео нужны `ffmpeg` и `ffprobe` в PATH активного окружения ComfyUI. Runtime JavaScript уже поставляется в `web/`; npm-пакеты нужны только для проверки TypeScript и пересборки frontend.
+```bash
+python -m pip install -r requirements.txt
+```
+
+Команда выполняется из каталога SilentFilm. PyTorch берётся из окружения ComfyUI; пакет не устанавливает другую CUDA-сборку. После установки перезапустите ComfyUI.
+
+Для загрузки и записи видео нужны `ffmpeg` и `ffprobe` в PATH процесса ComfyUI. Можно задать полные пути через `ALEXZ_FFMPEG` и `ALEXZ_FFPROBE`. Runtime JavaScript уже поставляется в `web/`; npm-пакеты нужны только для проверки TypeScript и пересборки frontend.
+
+Установка на Windows, включая ComfyUI Portable, настройка SSD-кэша и проверка переноса описаны в [гайде платформенной совместимости](guides/GUIDE_PLATFORM_COMPATIBILITY.md). Conda и Make не являются требованиями для работы нод.
 
 ## Workflow с дефектами
 
@@ -42,4 +50,4 @@ make test
 make frontend-build
 ```
 
-Команды используют Conda environment `p313-torch214-cu132`. Browser smoke выполняется пользователем вручную через Playwright MCP по `guides/GUIDE_BROWSER_SMOKE.md` после перезапуска ComfyUI.
+Makefile по умолчанию использует локальное Conda environment разработчика `p313-torch214-cu132`. Для другого окружения можно передать `CONDA_ENV=имя` либо `CONDA_RUN=` для текущего Python. Команды без Make для Windows приведены в гайде платформенной совместимости. Browser smoke выполняется пользователем вручную через Playwright MCP по `guides/GUIDE_BROWSER_SMOKE.md` после перезапуска ComfyUI.

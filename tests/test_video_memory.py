@@ -29,6 +29,9 @@ def test_video_memory_mapping_views_and_cleanup(memory, tmp_path):
     with patch.object(memory, "use_disk", return_value=True):
         output = memory.allocate_video((5, 11, 17, 3))
     address = output.untyped_storage().data_ptr()
+    mapping = memory._MAPPINGS[address]()
+    backing_file = mapping._temporary_file
+    del mapping
     expected = torch.rand(output.shape)
     for start, end in ((0, 2), (2, 5)):
         output[start:end].copy_(expected[start:end])
@@ -40,10 +43,14 @@ def test_video_memory_mapping_views_and_cleanup(memory, tmp_path):
     assert memory.disk_backed(alias)
     memory.release_video_pages(alias)
     torch.testing.assert_close(alias, expected[1:4], atol=0, rtol=0)
-    assert list(tmp_path.iterdir()) == []
+    assert not backing_file.closed
+    if memory.os.name == "posix":
+        assert list(tmp_path.iterdir()) == []
     del alias
     gc.collect()
     assert address not in memory._MAPPINGS
+    assert backing_file.closed
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_video_memory_disk_admission_and_small_ram_output(memory, tmp_path):
@@ -85,7 +92,7 @@ def test_video_memory_reservation_cancellation_releases_file(memory, tmp_path, m
     monkeypatch.setattr(memory, "check_interrupt", check)
     monkeypatch.setattr(memory, "use_disk", lambda *args, **kwargs: True)
     monkeypatch.setattr(memory, "RESERVATION_CHUNK_BYTES", 4096)
-    monkeypatch.setattr(memory.os, "posix_fallocate", (lambda *args: None) if fallocate else None)
+    monkeypatch.setattr(memory.os, "posix_fallocate", (lambda *args: None) if fallocate else None, raising=False)
     # Для ветки write размер превышает два блока по 8 МиБ.
     with pytest.raises(Cancelled):
         memory.allocate_video((3, 1024, 1024, 3))

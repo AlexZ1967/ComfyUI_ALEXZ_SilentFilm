@@ -7,6 +7,7 @@ import mmap
 import os
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import weakref
 
@@ -18,8 +19,34 @@ RAM_RESERVE = 512 * 1024**2
 HOST_RESERVE = 4 * 1024**3
 RESERVATION_CHUNK_BYTES = 64 * 1024**2
 CACHE_DIRECTORY = Path(os.environ.get("ALEXZ_VIDEO_CACHE_DIR", str(
-    (Path("/mnt/comfy") if Path("/mnt/comfy").is_dir() else Path(tempfile.gettempdir())) / "alexz-video-cache"))).expanduser()
+    (Path("/mnt/comfy") if sys.platform.startswith("linux") and Path("/mnt/comfy").is_dir()
+     else Path(tempfile.gettempdir())) / "alexz-video-cache"))).expanduser()
 _MAPPINGS = {}
+
+
+class _FileBackedMapping(mmap.mmap):
+    """Keep a temporary file open until its mapped buffer is released on every OS."""
+
+    def __new__(cls, file, size):
+        """Map the fully reserved file and retain its deletion handle."""
+        instance = super().__new__(cls, file.fileno(), size, access=mmap.ACCESS_WRITE)
+        instance._temporary_file = file
+        return instance
+
+    def __init__(self, file, size):
+        """Accept the file arguments already handled by the mmap constructor."""
+
+    def close(self):
+        """Unmap before closing the file, allowing Windows to delete it safely."""
+        super().close()
+        file = getattr(self, "_temporary_file", None)
+        if file is not None:
+            self._temporary_file = None
+            file.close()
+
+    def __del__(self):
+        """Release the mapping before its retained temporary-file owner."""
+        self.close()
 
 
 def check_interrupt():
@@ -123,17 +150,26 @@ def allocate_video(shape, *, dtype=torch.float32, device="cpu", label="Silent Fi
     if free < size + RAM_RESERVE:
         raise MemoryError(f"{label}: дисковому кэшу нужно {size / 1024**3:.2f} ГиБ плюс 0.5 ГиБ запаса; свободно {free / 1024**3:.2f} ГиБ в {CACHE_DIRECTORY}.")
     try:
-        with tempfile.TemporaryFile(dir=CACHE_DIRECTORY, prefix="frames-") as file:
+        file = tempfile.TemporaryFile(dir=CACHE_DIRECTORY, prefix="frames-")
+        try:
             # Резервируем блоки заранее: поздний ENOSPC при записи mmap может дать SIGBUS.
             _reserve_file(file, size)
-            mapping = mmap.mmap(file.fileno(), size, access=mmap.ACCESS_WRITE)
-        output = torch.frombuffer(mapping, dtype=dtype).reshape(tuple(shape))
+            file.flush()
+            mapping = _FileBackedMapping(file, size)
+        except BaseException:
+            file.close()
+            raise
+        try:
+            output = torch.frombuffer(mapping, dtype=dtype).reshape(tuple(shape))
+        except BaseException:
+            mapping.close()
+            raise
     except OSError as exc:
         raise MemoryError(f"{label}: не удалось зарезервировать дисковый кэш ({size / 1024**3:.2f} ГиБ): {exc}") from exc
     address = output.untyped_storage().data_ptr()
     _MAPPINGS[address] = weakref.ref(mapping, lambda ref: _forget_mapping(address, ref))
     _LOGGER.info("[%s] Выход: %.2f ГиБ, дисковый IMAGE-кэш в %s; без полного батча в RAM.", label, size / 1024**3, CACHE_DIRECTORY)
-    # TemporaryFile не оставляет имени; место освобождается с последним storage alias.
+    # На Windows имя может быть видно до освобождения последнего storage alias.
     return output
 
 
@@ -146,7 +182,7 @@ def disk_backed(images):
 
 
 def release_video_pages(images, start=0, end=None, *, written=False):
-    """Flush written frames and let Linux reclaim file-backed pages between chunks."""
+    """Flush mapped frames and request page reclamation where the OS supports it."""
     if not disk_backed(images):
         return
     mapping = _MAPPINGS[images.untyped_storage().data_ptr()]()

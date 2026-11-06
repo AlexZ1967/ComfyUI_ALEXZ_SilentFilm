@@ -185,7 +185,7 @@ def test_metadata_validation_and_registry(defects):
 def test_workflow_contains_ordered_defects_and_preserves_seed_and_preview(defects):
     """Ensure the export processes the complete chain and previews stay one frame."""
     root = Path(__file__).resolve().parents[1]
-    graph = json.loads((root / "workflows/Видео-в-Хронику-по-этапам.json").read_text())
+    graph = json.loads((root / "workflows/Видео-в-Хронику-по-этапам.json").read_text(encoding="utf-8"))
     nodes = {n["id"]: n for n in graph["nodes"]}
     links = {link[0]: link for link in graph["links"]}
     node = next(n for n in nodes.values() if n["type"] == "VideoSaveFinal")
